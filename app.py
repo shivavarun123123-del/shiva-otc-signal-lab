@@ -1,6 +1,8 @@
+
 import os
 import requests
-from flask import Flask, jsonify, render_template_string, request
+from datetime import datetime
+from flask import Flask, jsonify, render_template_string
 
 app = Flask(__name__)
 
@@ -14,57 +16,152 @@ HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SHIVA OTC SIGNAL LAB</title>
 <style>
-body { background:#101820; color:white; font-family:Arial; padding:20px; }
-.card { background:#1d2b38; padding:18px; border-radius:12px; margin-top:15px; }
-h1 { color:#00e6a0; }
-button,select { padding:12px; border-radius:7px; margin:5px; }
-button { background:#00c98b; border:0; font-weight:bold; }
-table { width:100%; margin-top:15px; border-collapse:collapse; }
-td,th { padding:8px; border-bottom:1px solid #52606d; text-align:center; }
-#result { overflow-x:auto; }
+body{background:#101820;color:white;font-family:Arial;padding:15px}
+h1{color:#00e6a0}
+.card{background:#1d2b38;padding:16px;border-radius:12px;margin:14px 0}
+.signal{font-size:25px;font-weight:bold}
+.buy{color:#00e6a0}.sell{color:#ff6464}.wait{color:#ffd166}
+small{color:#b8c4ce}
+button{background:#00c98b;padding:12px;border:0;border-radius:8px;font-weight:bold}
 </style>
 </head>
 <body>
 <h1>SHIVA OTC SIGNAL LAB</h1>
-<div class="card">
-<h3>Trading Dashboard</h3>
 <p>Bot Status: Connected</p>
-<p>Data Source: Twelve Data</p>
+<p>Data: Twelve Data - Forex</p>
+
+<div class="card">
+<h3>Trading Pair</h3>
 <select id="symbol">
 <option value="EUR/USD">EUR/USD</option>
 <option value="GBP/USD">GBP/USD</option>
 <option value="USD/JPY">USD/JPY</option>
 </select>
-<button onclick="fetchCandles()">Fetch Candles</button>
-<div id="result">Candles yahan dikhengi.</div>
+<button onclick="loadSignals()">Refresh Signals</button>
 </div>
+
+<div id="one" class="card">1M Signal: Loading...</div>
+<div id="five" class="card">5M Signal: Loading...</div>
+<p><small id="updated">Waiting for data...</small></p>
+
 <script>
-async function fetchCandles() {
- const symbol = document.getElementById("symbol").value;
- const result = document.getElementById("result");
- result.innerHTML = "Loading...";
- try {
-  const response = await fetch("/api/candles?symbol=" + encodeURIComponent(symbol));
-  const data = await response.json();
-  if (!response.ok) {
-    result.innerHTML = "Error: " + (data.error || "Data nahi mila");
-    return;
-  }
-  let html = "<p>Total candles: " + data.count + "</p>";
-  html += "<table><tr><th>Time</th><th>Open</th><th>High</th><th>Low</th><th>Close</th></tr>";
-  data.candles.forEach(c => {
-    html += "<tr><td>"+c.datetime+"</td><td>"+c.open+"</td><td>"+c.high+"</td><td>"+c.low+"</td><td>"+c.close+"</td></tr>";
-  });
-  html += "</table>";
-  result.innerHTML = html;
- } catch(e) {
-  result.innerHTML = "Connection error: " + e.message;
+function panel(id,title,s){
+ let cls=s.signal==="BUY"?"buy":s.signal==="SELL"?"sell":"wait";
+ document.getElementById(id).innerHTML=
+ `<h2>${title} Signal</h2>
+ <div class="signal ${cls}">${s.signal}</div>
+ <p>Entry Price: ${s.entry}</p>
+ <p>RSI 14: ${s.rsi}</p>
+ <p>EMA 9: ${s.ema9}</p>
+ <p>EMA 21: ${s.ema21}</p>
+ <p>Signal Strength: ${s.strength}</p>
+ <small>${s.note}</small>`;
+}
+async function loadSignals(){
+ document.getElementById("one").innerHTML="1M: Loading...";
+ document.getElementById("five").innerHTML="5M: Loading...";
+ try{
+  let symbol=document.getElementById("symbol").value;
+  let r=await fetch("/api/signals?symbol="+encodeURIComponent(symbol));
+  let d=await r.json();
+  if(!r.ok) throw new Error(d.error||"Data error");
+  panel("one","1M",d.one);
+  panel("five","5M",d.five);
+  document.getElementById("updated").innerText=
+   "Last update: "+new Date().toLocaleTimeString();
+ }catch(e){
+  document.getElementById("one").innerText="Error: "+e.message;
+  document.getElementById("five").innerText="Please try again later.";
  }
 }
+loadSignals();
+// Free API credits bachane ke liye automatic refresh har 3 minute.
+setInterval(loadSignals,180000);
 </script>
 </body>
 </html>
 """
+
+def ema(values, period):
+    if len(values) < period:
+        return None
+    result = sum(values[:period]) / period
+    multiplier = 2 / (period + 1)
+    for price in values[period:]:
+        result = (price - result) * multiplier + result
+    return result
+
+def rsi(values, period=14):
+    if len(values) <= period:
+        return None
+    changes = [values[i] - values[i-1] for i in range(1, len(values))]
+    gains = [max(x, 0) for x in changes]
+    losses = [max(-x, 0) for x in changes]
+    avg_gain = sum(gains[:period]) / period
+    avg_loss = sum(losses[:period]) / period
+    for i in range(period, len(gains)):
+        avg_gain = (avg_gain * (period-1) + gains[i]) / period
+        avg_loss = (avg_loss * (period-1) + losses[i]) / period
+    if avg_loss == 0:
+        return 100.0
+    return 100 - (100 / (1 + avg_gain / avg_loss))
+
+def make_signal(candles):
+    if len(candles) < 25:
+        raise ValueError("Not enough candles for indicators")
+
+    closes = [float(c["close"]) for c in candles]
+    e9 = ema(closes, 9)
+    e21 = ema(closes, 21)
+    rv = rsi(closes, 14)
+    price = closes[-1]
+
+    signal = "WAIT"
+    strength = "Low"
+    note = "Clear trend nahi hai. Trade ka wait karein."
+
+    if e9 > e21 and 50 < rv < 70:
+        signal = "BUY"
+        strength = "Medium"
+        note = "EMA bullish aur RSI supportive hai."
+    elif e9 < e21 and 30 < rv < 50:
+        signal = "SELL"
+        strength = "Medium"
+        note = "EMA bearish aur RSI supportive hai."
+    elif e9 > e21 and rv >= 70:
+        note = "RSI overbought zone mein hai. BUY chase na karein."
+    elif e9 < e21 and rv <= 30:
+        note = "RSI oversold zone mein hai. SELL chase na karein."
+
+    return {
+        "signal": signal,
+        "entry": round(price, 5),
+        "rsi": round(rv, 2),
+        "ema9": round(e9, 5),
+        "ema21": round(e21, 5),
+        "strength": strength,
+        "note": note
+    }
+
+def aggregate_five_minutes(candles):
+    groups = {}
+    for c in candles:
+        dt = datetime.strptime(c["datetime"], "%Y-%m-%d %H:%M:%S")
+        bucket = dt.replace(minute=(dt.minute // 5) * 5, second=0)
+        key = bucket.strftime("%Y-%m-%d %H:%M:%S")
+        groups.setdefault(key, []).append(c)
+
+    result = []
+    for key in sorted(groups):
+        group = groups[key]
+        result.append({
+            "datetime": key,
+            "open": group[0]["open"],
+            "high": max(float(x["high"]) for x in group),
+            "low": min(float(x["low"]) for x in group),
+            "close": group[-1]["close"]
+        })
+    return result
 
 @app.route("/")
 def home():
@@ -74,15 +171,13 @@ def home():
 def health():
     return jsonify({"status": "ok"})
 
-@app.route("/api/candles")
-def candles():
+@app.route("/api/signals")
+def signals():
     if not API_KEY:
-        return jsonify({"error": "TWELVE_DATA_API_KEY Render Environment mein missing hai"}), 500
+        return jsonify({"error": "TWELVE_DATA_API_KEY missing"}), 500
 
     symbol = request.args.get("symbol", "EUR/USD")
-    allowed = ["EUR/USD", "GBP/USD", "USD/JPY"]
-
-    if symbol not in allowed:
+    if symbol not in ["EUR/USD", "GBP/USD", "USD/JPY"]:
         return jsonify({"error": "Invalid symbol"}), 400
 
     try:
@@ -91,29 +186,35 @@ def candles():
             params={
                 "symbol": symbol,
                 "interval": "1min",
-                "outputsize": 30,
+                "outputsize": 250,
                 "apikey": API_KEY
             },
             timeout=20
         )
-
         data = response.json()
 
         if response.status_code != 200 or "values" not in data:
-            message = data.get("message", data.get("code", "Data unavailable"))
-            return jsonify({"error": str(message)}), 502
+            return jsonify({
+                "error": data.get("message", "Twelve Data error")
+            }), 502
+
+        candles = list(reversed(data["values"]))
+        five_candles = aggregate_five_minutes(candles)
 
         return jsonify({
             "symbol": symbol,
-            "count": len(data["values"]),
-            "candles": data["values"]
+            "one": make_signal(candles),
+            "five": make_signal(five_candles)
         })
 
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 502
     except requests.exceptions.RequestException:
-        return jsonify({"error": "Twelve Data se connect nahi ho pa raha"}), 502
+        return jsonify({"error": "Could not connect to Twelve Data"}), 502
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+
 
