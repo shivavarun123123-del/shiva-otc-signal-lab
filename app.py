@@ -2,7 +2,7 @@
 import os
 import requests
 from datetime import datetime
-from flask import Flask, jsonify, render_template_string
+from flask import Flask, jsonify, render_template_string, request
 
 app = Flask(__name__)
 
@@ -63,7 +63,18 @@ async function loadSignals(){
  try{
   let symbol=document.getElementById("symbol").value;
   let r=await fetch("/api/signals?symbol="+encodeURIComponent(symbol));
-  let d=await r.json();
+  let text = await r.text();
+let d;
+
+try {
+    d = JSON.parse(text);
+} catch (err) {
+    throw new Error("Backend JSON error");
+}
+
+if (!r.ok) {
+    throw new Error(d.error || "API Error");
+}
   if(!r.ok) throw new Error(d.error||"Data error");
   panel("one","1M",d.one);
   panel("five","5M",d.five);
