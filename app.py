@@ -6,7 +6,8 @@ from flask import Flask, jsonify, render_template_string, request
 
 app = Flask(__name__)
 
-API_KEY = os.environ.get("TWELVE_DATA_API_KEY", "")
+API_KEY = os.environ.get("TWELVE_DATA_API_KEY", "").strip()
+
 API_URL = "https://api.twelvedata.com/time_series"
 
 HTML = """
