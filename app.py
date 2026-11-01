@@ -203,12 +203,18 @@ def signals():
             },
             timeout=20
         )
-        data = response.json()
+        try:
+    data = response.json()
+except ValueError:
+    return jsonify({"error": "Invalid API response"}), 502
 
-        if response.status_code != 200 or "values" not in data:
-            return jsonify({
-                "error": data.get("message", "Twelve Data error")
-            }), 502
+if response.status_code != 200 or "values" not in data:
+    return jsonify({
+        "error": data.get("message", "Twelve Data error")
+    }), 502
+
+if not isinstance(data["values"], list) or not data["values"]:
+    return jsonify({"error": "No candle data received"}), 502
 
         candles = list(reversed(data["values"]))
         five_candles = aggregate_five_minutes(candles)
