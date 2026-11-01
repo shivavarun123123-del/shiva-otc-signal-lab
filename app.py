@@ -216,7 +216,14 @@ if response.status_code != 200 or "values" not in data:
 if not isinstance(data["values"], list) or not data["values"]:
     return jsonify({"error": "No candle data received"}), 502
 
-        candles = list(reversed(data["values"]))
+        candles = [
+    c for c in reversed(data["values"])
+    if all(k in c and c[k] is not None
+           for k in ["datetime", "open", "high", "low", "close"])
+]
+
+if len(candles) < 25:
+    return jsonify({"error": "Not enough valid candles"}), 502
         five_candles = aggregate_five_minutes(candles)
 
         return jsonify({
