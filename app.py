@@ -157,11 +157,51 @@ def make_signal(candles):
 
 def aggregate_five_minutes(candles):
     groups = {}
+
     for c in candles:
-        dt = datetime.strptime(c["datetime"], "%Y-%m-%d %H:%M:%S")
-        bucket = dt.replace(minute=(dt.minute // 5) * 5, second=0)
+        dt = datetime.strptime(
+            c["datetime"], "%Y-%m-%d %H:%M:%S"
+        )
+
+        bucket = dt.replace(
+            minute=(dt.minute // 5) * 5,
+            second=0
+        )
+
         key = bucket.strftime("%Y-%m-%d %H:%M:%S")
         groups.setdefault(key, []).append(c)
+
+    result = []
+
+    for key in sorted(groups):
+        group = sorted(
+            groups[key],
+            key=lambda x: x["datetime"]
+        )
+
+        # Sirf complete 5-minute candles
+        if len(group) != 5:
+            continue
+
+        times = [
+            datetime.strptime(
+                c["datetime"], "%Y-%m-%d %H:%M:%S"
+            )
+            for c in group
+        ]
+
+        if [t.minute % 5 for t in times] != [0, 1, 2, 3, 4]:
+            continue
+
+        result.append({
+            "datetime": key,
+            "open": float(group[0]["open"]),
+            "high": max(float(x["high"]) for x in group),
+            "low": min(float(x["low"]) for x in group),
+            "close": float(group[-1]["close"])
+        })
+
+    return result
 
     result = []
     for key in sorted(groups):
