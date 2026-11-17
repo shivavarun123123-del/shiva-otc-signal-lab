@@ -86,13 +86,13 @@ function panel(id,title,s) {
     <h2>${title} Signal</h2>
     <div class="signal ${cls}">${s.signal}</div>
     <p>Entry Price: ${s.entry}</p>
+<p>Candle Momentum: ${s.momentum}</p>
     <p>RSI 14: ${s.rsi}</p>
     <p>EMA 9: ${s.ema9}</p>
     <p>EMA 21: ${s.ema21}</p>
     <p>Signal Strength: ${s.strength}</p>
     <small>${s.note}</small>`;
 }
-
 function finalPanel(s) {
     let cls = s.signal==="BUY" ? "buy" :
               s.signal==="SELL" ? "sell" : "wait";
@@ -101,7 +101,9 @@ function finalPanel(s) {
     <h2>FINAL CONFIRMATION V2.1</h2>
     <div class="signal ${cls}">${s.signal}</div>
     <p>Entry Price: ${s.entry}</p>
-    <p>Confirmation: ${s.confirmation}</p>
+   <p>Confirmation Score: ${s.score}/100</p>
+<p>Candle Momentum: ${s.momentum}</p>
+<p>Confirmation: ${s.confirmation}</p>
     <p>Signal Strength: ${s.strength}</p>
     <small>${s.note}</small>`;
 }
@@ -208,7 +210,15 @@ def make_signal(candles):
     e9 = ema(closes, 9)
     e21 = ema(closes, 21)
     rv = rsi(closes, 14)
-    price = closes[-1]
+    price = closes[-1]   
+    last_candle = candles[-1]
+
+    if float(last_candle["close"]) > float(last_candle["open"]):
+        momentum = "BULLISH"
+    elif float(last_candle["close"]) < float(last_candle["open"]):
+        momentum = "BEARISH"
+    else:
+        momentum = "NEUTRAL"
 
     signal = "WAIT"
     strength = "Low"
@@ -230,7 +240,8 @@ def make_signal(candles):
     elif e9 < e21 and rv <= 30:
         note = "RSI oversold hai. SELL chase na karein."
 
-    return {
+    return { 
+        "momentum": momentum,
         "signal": signal,
         "entry": round(price, 5),
         "rsi": round(rv, 2),
@@ -289,35 +300,83 @@ def aggregate_five_minutes(candles):
     return result
 
 
+
 def smart_confirmation(one, five):
     signal1 = one["signal"]
     signal5 = five["signal"]
 
+    score = 50
+    confirmation = "Timeframe mismatch"
+    note = "Clear confirmation nahi hai."
+
+    if signal1 == signal5 and signal1 in ["BUY", "SELL"]:
+        score += 25
+        confirmation = "1M + 5M Agreement"
+
     if signal1 == "BUY" and signal5 == "BUY":
+        if one["ema9"] > one["ema21"] and five["ema9"] > five["ema21"]:
+            score += 10
+        if 50 < one["rsi"] < 70 and 50 < five["rsi"] < 70:
+            score += 10
         signal = "BUY"
-        strength = "Strong"
-        confirmation = "1M + 5M Bullish"
-        note = "Dono timeframes BUY confirm kar rahe hain."
+        note = "Bullish trend confirmed."
 
     elif signal1 == "SELL" and signal5 == "SELL":
+        if one["ema9"] < one["ema21"] and five["ema9"] < five["ema21"]:
+            score += 10
+        if 30 < one["rsi"] < 50 and 30 < five["rsi"] < 50:
+            score += 10
         signal = "SELL"
-        strength = "Strong"
-        confirmation = "1M + 5M Bearish"
-        note = "Dono timeframes SELL confirm kar rahe hain."
+        note = "Bearish trend confirmed."
 
     else:
         signal = "WAIT"
-        strength = "Low"
-        confirmation = "Timeframe mismatch"
-        note = "Dono timeframes agree nahi kar rahe. Trade wait karein."
+        note = "1M aur 5M agree nahi kar rahe."
+
+    if signal == "BUY":
+        if one["momentum"] == "BULLISH" and five["momentum"] == "BULLISH":
+            score += 5
+            confirmation += " + Bullish Momentum"
+        else:
+            signal = "WAIT"
+            score = min(score, 69)
+            confirmation = "Candle momentum not confirmed"
+            note = "BUY ke liye bullish candle confirmation nahi hai."
+
+    elif signal == "SELL":
+        if one["momentum"] == "BEARISH" and five["momentum"] == "BEARISH":
+            score += 5
+            confirmation += " + Bearish Momentum"
+        else:
+            signal = "WAIT"
+            score = min(score, 69)
+            confirmation = "Candle momentum not confirmed"
+            note = "SELL ke liye bearish candle confirmation nahi hai."
+
+    score = min(score, 100)
+
+    if score >= 85:
+        strength = "Strong"
+    elif score >= 70:
+        strength = "Medium"
+    else:
+        strength = "Weak"
+
+    if signal == "WAIT":
+        strength = "Weak"
 
     return {
         "signal": signal,
         "entry": one["entry"],
         "strength": strength,
+        "score": score,
         "confirmation": confirmation,
         "note": note
+        "momentum": one["momentum"] + " / " + five["momentum"],
+  "score": score,
+"momentum": one["momentum"] + " / " + five["momentum"],
     }
+
 
 
 @app.route("/")
