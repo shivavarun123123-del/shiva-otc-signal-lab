@@ -301,6 +301,8 @@ def aggregate_five_minutes(candles):
 
 
 
+
+    
 def smart_confirmation(one, five):
     signal1 = one["signal"]
     signal5 = five["signal"]
@@ -361,6 +363,7 @@ def smart_confirmation(one, five):
         strength = "Medium"
     else:
         strength = "Weak"
+
     if signal == "WAIT":
         strength = "Weak"
 
@@ -368,56 +371,12 @@ def smart_confirmation(one, five):
         "signal": signal,
         "entry": one["entry"],
         "strength": strength,
-       
-return {
-    "signal": signal,
-    "entry": one["entry"],
-    "strength": strength,
-    "score": score,
-    "confirmation": confirmation,
-    "momentum": one["momentum"] + " / " + five["momentum"],
-    "note": note
-}
-
-
-@app.route("/")
-def home():
-    return render_template_string(HTML)
-
-
-@app.route("/health")
-def health():
-    return jsonify({"status": "ok", "version": "V2.1"})
-
-
-@app.route("/api/signals")
-def signals():
-    if not API_KEY:
+        "score": score,
+        "confirmation": confirmation,
+        "momentum": one["momentum"] + " / " + five["momentum"],
+        "note": note
+    }
         return jsonify({
-            "error": "TWELVE_DATA_API_KEY missing"
-        }), 500
-
-    symbol = request.args.get("symbol", "EUR/USD")
-
-    if symbol not in ["EUR/USD", "GBP/USD", "USD/JPY"]:
-        return jsonify({"error": "Invalid symbol"}), 400
-
-    try:
-        response = requests.get(
-            API_URL,
-            params={
-                "symbol": symbol,
-                "interval": "1min",
-                "outputsize": 250,
-                "apikey": API_KEY
-            },
-            timeout=20
-        )
-
-        try:
-            data = response.json()
-        except ValueError:
-            return jsonify({
                 "error": "Invalid API response"
             }), 502
 
