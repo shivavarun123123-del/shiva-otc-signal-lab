@@ -360,7 +360,7 @@ def smart_confirmation(one, five):
     elif score >= 70:
         strength = "Medium"
     else:
-        stre
+        strength = "Weak"
     if signal == "WAIT":
         strength = "Weak"
 
