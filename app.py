@@ -376,7 +376,45 @@ def smart_confirmation(one, five):
         "momentum": one["momentum"] + " / " + five["momentum"],
         "note": note
     }
+        
+@app.route("/")
+def home():
+    return render_template_string(HTML)
+
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok", "version": "V2.2"})
+
+
+@app.route("/api/signals")
+def signals():
+    if not API_KEY:
         return jsonify({
+            "error": "TWELVE_DATA_API_KEY missing"
+        }), 500
+
+    symbol = request.args.get("symbol", "EUR/USD")
+
+    if symbol not in ["EUR/USD", "GBP/USD", "USD/JPY"]:
+        return jsonify({"error": "Invalid symbol"}), 400
+
+    try:
+        response = requests.get(
+            API_URL,
+            params={
+                "symbol": symbol,
+                "interval": "1min",
+                "outputsize": 250,
+                "apikey": API_KEY
+            },
+            timeout=20
+        )
+
+        try:
+            data = response.json()
+        except ValueError:
+            return jsonify({
                 "error": "Invalid API response"
             }), 502
 
@@ -444,3 +482,4 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=int(os.environ.get("PORT", 10000))
     )
+
