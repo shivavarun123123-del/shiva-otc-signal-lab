@@ -360,8 +360,7 @@ def smart_confirmation(one, five):
     elif score >= 70:
         strength = "Medium"
     else:
-        strength = "Weak"
-
+        stre
     if signal == "WAIT":
         strength = "Weak"
 
@@ -369,14 +368,16 @@ def smart_confirmation(one, five):
         "signal": signal,
         "entry": one["entry"],
         "strength": strength,
-        "score": score,
-        "confirmation": confirmation,
-        "note": note
-        "momentum": one["momentum"] + " / " + five["momentum"],
-  "score": score,
-"momentum": one["momentum"] + " / " + five["momentum"],
-    }
-
+       
+return {
+    "signal": signal,
+    "entry": one["entry"],
+    "strength": strength,
+    "score": score,
+    "confirmation": confirmation,
+    "momentum": one["momentum"] + " / " + five["momentum"],
+    "note": note
+}
 
 
 @app.route("/")
