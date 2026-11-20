@@ -540,60 +540,69 @@ def aggregate_five_minutes(candles):
 
 
     
+
 def smart_confirmation(one, five):
     signal1 = one["signal"]
     signal5 = five["signal"]
 
+    momentum1 = one["momentum"]
+    momentum5 = five["momentum"]
+
     score = 0
+    signal = "WAIT"
+    early_signal = "NONE"
     confirmation = "Timeframe mismatch"
     note = "Clear confirmation nahi hai."
-    signal = "WAIT"
 
-    if signal1 == signal5 and signal1 in ["BUY", "SELL"]:
+    # EARLY TREND DETECTION
+    if momentum1 == "BULLISH" and momentum5 == "BULLISH":
+        early_signal = "EARLY BUY"
+
+    elif momentum1 == "BEARISH" and momentum5 == "BEARISH":
+        early_signal = "EARLY SELL"
+
+    # BUY CONFIRMATION
+    if signal1 == "BUY" and signal5 == "BUY":
+        confirmation = "1M + 5M BUY Agreement"
         score += 30
-        confirmation = "1M + 5M Agreement"
 
-        if signal1 == "BUY":
-            if one["ema9"] > one["ema21"] and five["ema9"] > five["ema21"]:
-                score += 20
+        if one["ema9"] > one["ema21"] and five["ema9"] > five["ema21"]:
+            score += 25
 
-            if 50 < one["rsi"] < 70 and 50 < five["rsi"] < 70:
-                score += 15
-            else:
-                score -= 10
+        if 50 < one["rsi"] < 70 and 50 < five["rsi"] < 70:
+            score += 15
 
-            if one["momentum"] == "BULLISH" and five["momentum"] == "BULLISH":
-                score += 25
-                confirmation += " + Bullish Momentum"
-                signal = "BUY"
-                note = "Bullish trend confirmed."
+        if momentum1 == "BULLISH" and momentum5 == "BULLISH":
+            score += 30
+            signal = "BUY"
+            note = "Bullish trend fully confirmed."
 
-        elif signal1 == "SELL":
-            if one["ema9"] < one["ema21"] and five["ema9"] < five["ema21"]:
-                score += 20
+    # SELL CONFIRMATION
+    elif signal1 == "SELL" and signal5 == "SELL":
+        confirmation = "1M + 5M SELL Agreement"
+        score += 30
 
-            if 30 < one["rsi"] < 50 and 30 < five["rsi"] < 50:
-                score += 15
-            else:
-                score -= 10
+        if one["ema9"] < one["ema21"] and five["ema9"] < five["ema21"]:
+            score += 25
 
-            if one["momentum"] == "BEARISH" and five["momentum"] == "BEARISH":
-                score += 25
-                confirmation += " + Bearish Momentum"
-                signal = "SELL"
-                note = "Bearish trend confirmed."
+        if 30 < one["rsi"] < 50 and 30 < five["rsi"] < 50:
+            score += 15
 
-        if signal == "WAIT":
-            confirmation = "Momentum not confirmed"
-            note = "Candle momentum confirmation ka wait karein."
+        if momentum1 == "BEARISH" and momentum5 == "BEARISH":
+            score += 30
+            signal = "SELL"
+            note = "Bearish trend fully confirmed."
 
     else:
-        note = "1M aur 5M signals match nahi kar rahe."
+        note = "Timeframe signals match nahi kar rahe."
 
     score = max(0, min(score, 100))
 
     if signal == "WAIT":
         strength = "Weak"
+        if early_signal != "NONE":
+            confirmation = "Early momentum detected"
+            note = early_signal + " detected. Final confirmation ka wait karein."
     elif score >= 85:
         strength = "Strong"
     elif score >= 70:
@@ -601,9 +610,19 @@ def smart_confirmation(one, five):
     else:
         signal = "WAIT"
         strength = "Weak"
-        note = "Confirmation score kam hai. Trade avoid karein."
+        note = "Confirmation score kam hai."
 
     return {
+        "signal": signal,
+        "early_signal": early_signal,
+        "entry": one["entry"],
+        "strength": strength,
+        "score": score,
+        "confirmation": confirmation,
+        "momentum": momentum1 + " / " + momentum5,
+        "note": note
+    }
+
         "signal": signal,
         "entry": one["entry"],
         "strength": strength,
