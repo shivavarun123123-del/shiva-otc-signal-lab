@@ -623,25 +623,7 @@ def smart_confirmation(one, five):
         "note": note
     }
 
-        "signal": signal,
-        "entry": one["entry"],
-        "strength": strength,
-        "score": score,
-        "confirmation": confirmation,
-        "momentum": one["momentum"] + " / " + five["momentum"],
-        "note": note
-    }
-
-
-    return {
-        "signal": signal,
-        "entry": one["entry"],
-        "strength": strength,
-        "score": score,
-        "confirmation": confirmation,
-        "momentum": one["momentum"] + " / " + five["momentum"],
-        "note": note
-    }
+       
         
 @app.route("/")
 def home():
