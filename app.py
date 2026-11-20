@@ -90,6 +90,12 @@ select {
 <p>Waiting for analysis...</p>
 </div>
 
+<div id="early" class="card">
+    <h2>EARLY TREND DETECTION V2.4.1</h2>
+    <div id="earlySignal">NO SETUP</div>
+    <p id="earlyNote">Waiting for momentum analysis...</p>
+</div>
+
 <div id="one" class="card">1M Signal: Loading...</div>
 <div id="five" class="card">5M Signal: Loading...</div>
 
@@ -365,6 +371,17 @@ async function loadSignals() {
         panel("one", "1M", data.one);
         panel("five", "5M", data.five);
         finalPanel(data.final);
+        
+const early = data.final.early_signal || "NONE";
+
+document.getElementById("earlySignal").innerText =
+    early === "NONE" ? "NO SETUP" : early;
+
+document.getElementById("earlyNote").innerText =
+    early === "NONE"
+        ? "Waiting for both timeframes to confirm momentum."
+        : early + " detected. Final confirmation ka wait karein.";
+
 
         recordSignal(symbol, data.final);
 
