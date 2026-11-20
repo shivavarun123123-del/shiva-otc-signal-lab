@@ -113,6 +113,9 @@ select {
 
 <script>
 
+
+let verificationBusy = false;
+
 const HISTORY_KEY = "shiva_otc_v23_history";
 
 function getHistory() {
@@ -137,9 +140,9 @@ function escapeHTML(value) {
     })[c]);
 }
 
-function panel(id,title,s) {
-    let cls = s.signal==="BUY" ? "buy" :
-              s.signal==="SELL" ? "sell" : "wait";
+function panel(id, title, s) {
+    let cls = s.signal === "BUY" ? "buy" :
+              s.signal === "SELL" ? "sell" : "wait";
 
     document.getElementById(id).innerHTML = `
     <h2>${title} Signal</h2>
@@ -154,11 +157,11 @@ function panel(id,title,s) {
 }
 
 function finalPanel(s) {
-    let cls = s.signal==="BUY" ? "buy" :
-              s.signal==="SELL" ? "sell" : "wait";
+    let cls = s.signal === "BUY" ? "buy" :
+              s.signal === "SELL" ? "sell" : "wait";
 
     document.getElementById("final").innerHTML = `
-    <h2>FINAL CONFIRMATION V2.3</h2>
+    <h2>FINAL CONFIRMATION V2.4</h2>
     <div class="signal ${cls}">${escapeHTML(s.signal)}</div>
     <p>Entry Price: ${escapeHTML(s.entry)}</p>
     <p>Confirmation Score: ${escapeHTML(s.score)}/100</p>
@@ -168,15 +171,14 @@ function finalPanel(s) {
     <small>${escapeHTML(s.note)}</small>`;
 }
 
+// SAVE NEW SIGNAL
 function recordSignal(symbol, s) {
     let history = getHistory();
-
     let now = Date.now();
-    let entry = String(s.entry);
 
+    let entry = String(s.entry);
     let last = history[0];
 
-    // Avoid repeated identical records within 3 minutes
     if (last &&
         last.symbol === symbol &&
         last.signal === s.signal &&
@@ -184,6 +186,8 @@ function recordSignal(symbol, s) {
         now - last.time < 180000) {
         return;
     }
+
+    let tradable = s.signal === "BUY" || s.signal === "SELL";
 
     history.unshift({
         symbol: symbol,
@@ -193,7 +197,9 @@ function recordSignal(symbol, s) {
         strength: s.strength,
         note: s.note,
         time: now,
-        outcome: null
+        verifyAt: tradable ? now + 60000 : null,
+        outcome: null,
+        exitPrice: null
     });
 
     history = history.slice(0, 10);
@@ -202,27 +208,87 @@ function recordSignal(symbol, s) {
     renderHistory();
 }
 
-function markOutcome(index, outcome) {
+// AUTOMATIC 1 MINUTE VERIFICATION
+async function checkPendingSignals() {
+    if (verificationBusy) return;
+
     let history = getHistory();
+    let now = Date.now();
 
-    if (!history[index]) return;
-    if (!["WIN", "LOSS"].includes(outcome)) return;
+    let index = history.findIndex(x =>
+        (x.signal === "BUY" || x.signal === "SELL") &&
+        !x.outcome &&
+        x.verifyAt &&
+        now >= x.verifyAt
+    );
 
-    history[index].outcome = outcome;
+    if (index === -1) return;
 
-    saveHistory(history);
-    renderHistory();
+    verificationBusy = true;
+
+    try {
+        let item = history[index];
+
+        let response = await fetch(
+            "/api/signals?symbol=" +
+            encodeURIComponent(item.symbol)
+        );
+
+        let data = await response.json();
+
+        if (!response.ok || !data.one) {
+            throw new Error(data.error || "Price verification failed");
+        }
+
+        let entry = Number(item.entry);
+        let exit = Number(data.one.entry);
+
+        if (!Number.isFinite(entry) ||
+            !Number.isFinite(exit)) {
+            throw new Error("Invalid verification price");
+        }
+
+        let outcome = "DRAW";
+
+        if (exit > entry) {
+            outcome = item.signal === "BUY" ? "WIN" : "LOSS";
+        } else if (exit < entry) {
+            outcome = item.signal === "SELL" ? "WIN" : "LOSS";
+        }
+
+        history = getHistory();
+
+        let current = history.find(x => x.time === item.time);
+
+        if (!current || current.outcome) return;
+
+        current.outcome = outcome;
+        current.exitPrice = exit;
+        current.verifiedAt = Date.now();
+
+        saveHistory(history);
+        renderHistory();
+
+    } catch(e) {
+        console.warn("Auto verification:", e.message);
+    } finally {
+        verificationBusy = false;
+    }
 }
 
+// HISTORY AND ACCURACY
 function renderHistory() {
     let history = getHistory();
+
     let wins = history.filter(x => x.outcome === "WIN").length;
     let losses = history.filter(x => x.outcome === "LOSS").length;
+    let draws = history.filter(x => x.outcome === "DRAW").length;
 
-    let resolved = wins + losses;
+    let resolved = wins + losses + draws;
+    let decided = wins + losses;
 
-    let accuracy = resolved > 0
-        ? ((wins / resolved) * 100).toFixed(1)
+    let accuracy = decided > 0
+        ? ((wins / decided) * 100).toFixed(1)
         : "0.0";
 
     document.getElementById("wins").innerText = wins;
@@ -237,25 +303,21 @@ function renderHistory() {
     }
 
     document.getElementById("history").innerHTML =
-        history.map((x, i) => {
-
+        history.map(x => {
             let cls = x.signal === "BUY" ? "buy" :
                       x.signal === "SELL" ? "sell" : "wait";
 
             let result = x.outcome === "WIN"
-                ? '<span class="win">WIN</span>'
+                ? '<span class="win">AUTO WIN</span>'
                 : x.outcome === "LOSS"
-                ? '<span class="loss">LOSS</span>'
-                : '<span>Pending verification</span>';
-
-            let buttons = "";
-
-            if (!x.outcome &&
-                (x.signal === "BUY" || x.signal === "SELL")) {
-                buttons = `
-                <button onclick="markOutcome(${i},'WIN')">Mark WIN</button>
-                <button onclick="markOutcome(${i},'LOSS')">Mark LOSS</button>`;
-            }
+                ? '<span class="loss">AUTO LOSS</span>'
+                : x.outcome === "DRAW"
+                ? '<span>DRAW</span>'
+                : x.signal === "WAIT"
+                ? '<span>NO TRADE</span>'
+                : x.verifyAt
+                ? '<span>WAITING FOR 1M VERIFICATION</span>'
+                : '<span>OLD RECORD - NOT VERIFIED</span>';
 
             return `
             <div class="history-item">
@@ -264,15 +326,16 @@ function renderHistory() {
                     ${escapeHTML(x.signal)}
                 </div>
                 <p>Entry: ${escapeHTML(x.entry)}</p>
+                <p>Exit: ${x.exitPrice === null ? "Pending" : escapeHTML(x.exitPrice)}</p>
                 <p>Score: ${escapeHTML(x.score)}/100</p>
                 <p>Strength: ${escapeHTML(x.strength)}</p>
                 <p>Time: ${new Date(x.time).toLocaleString()}</p>
                 <p>Result: ${result}</p>
-                ${buttons}
             </div>`;
         }).join("");
 }
 
+// CLEAR HISTORY
 function clearHistory() {
     if (!confirm("Delete all signal history?")) return;
 
@@ -280,8 +343,8 @@ function clearHistory() {
     renderHistory();
 }
 
+// LOAD LIVE SIGNALS
 async function loadSignals() {
-
     document.getElementById("one").innerText = "1M: Loading...";
     document.getElementById("five").innerText = "5M: Loading...";
     document.getElementById("final").innerText = "Analyzing...";
@@ -289,28 +352,21 @@ async function loadSignals() {
     try {
         let symbol = document.getElementById("symbol").value;
 
-        let r = await fetch(
+        let response = await fetch(
             "/api/signals?symbol=" + encodeURIComponent(symbol)
         );
 
-        let text = await r.text();
-        let d;
+        let data = await response.json();
 
-        try {
-            d = JSON.parse(text);
-        } catch(e) {
-            throw new Error("Backend JSON error");
+        if (!response.ok) {
+            throw new Error(data.error || "API Error");
         }
 
-        if (!r.ok) {
-            throw new Error(d.error || "API Error");
-        }
+        panel("one", "1M", data.one);
+        panel("five", "5M", data.five);
+        finalPanel(data.final);
 
-        panel("one", "1M", d.one);
-        panel("five", "5M", d.five);
-        finalPanel(d.final);
-
-        recordSignal(symbol, d.final);
+        recordSignal(symbol, data.final);
 
         document.getElementById("updated").innerText =
             "Last update: " + new Date().toLocaleTimeString();
@@ -331,6 +387,7 @@ renderHistory();
 loadSignals();
 
 setInterval(loadSignals, 180000);
+setInterval(checkPendingSignals, 5000);
 
 </script>
 </body>
