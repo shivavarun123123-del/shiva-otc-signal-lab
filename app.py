@@ -9,12 +9,15 @@ app = Flask(__name__)
 API_KEY = os.environ.get("TWELVE_DATA_API_KEY", "").strip()
 API_URL = "https://api.twelvedata.com/time_series"
 
+
+
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SHIVA OTC SIGNAL LAB V2.1</title>
+<title>SHIVA OTC SIGNAL LAB V2.3</title>
+
 <style>
 body {
     background:#101820;
@@ -39,22 +42,37 @@ h1 {color:#00e6a0}
 small {color:#b8c4ce}
 button {
     background:#00c98b;
-    padding:12px;
+    padding:10px;
     border:0;
     border-radius:8px;
     font-weight:bold;
+    margin:4px;
 }
 select {
     padding:10px;
     border-radius:7px;
 }
+.win {color:#00e6a0}
+.loss {color:#ff6464}
+.history-item {
+    background:#263746;
+    padding:12px;
+    border-radius:9px;
+    margin:10px 0;
+}
+.stats {
+    font-size:23px;
+    font-weight:bold;
+    color:#00e6a0;
+}
 </style>
 </head>
+
 <body>
 
 <h1>SHIVA OTC SIGNAL LAB</h1>
 <p>Bot Status: Connected</p>
-<p>Engine: Smart Confirmation V2.1</p>
+<p>Engine: Smart Confirmation V2.3</p>
 
 <div class="card">
 <h3>Trading Pair</h3>
@@ -67,7 +85,7 @@ select {
 </div>
 
 <div id="final" class="card">
-<h2>FINAL CONFIRMATION</h2>
+<h2>FINAL CONFIRMATION V2.3</h2>
 <div class="signal wait">WAIT</div>
 <p>Waiting for analysis...</p>
 </div>
@@ -75,43 +93,198 @@ select {
 <div id="one" class="card">1M Signal: Loading...</div>
 <div id="five" class="card">5M Signal: Loading...</div>
 
+<div class="card">
+<h2>ACCURACY TRACKER</h2>
+<p>Wins: <span id="wins">0</span></p>
+<p>Losses: <span id="losses">0</span></p>
+<p>Resolved Trades: <span id="resolved">0</span></p>
+<div class="stats" id="accuracy">0%</div>
+<small>Accuracy is based only on manually marked outcomes.</small>
+</div>
+
+<div class="card">
+<h2>SIGNAL HISTORY</h2>
+<p><small>Last 10 signals</small></p>
+<div id="history">No signals recorded yet.</div>
+<button onclick="clearHistory()">Clear History</button>
+</div>
+
 <p><small id="updated">Waiting for data...</small></p>
 
 <script>
+
+const HISTORY_KEY = "shiva_otc_v23_history";
+
+function getHistory() {
+    try {
+        return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+    } catch(e) {
+        return [];
+    }
+}
+
+function saveHistory(history) {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+}
+
+function escapeHTML(value) {
+    return String(value ?? "").replace(/[&<>"']/g, c => ({
+        "&":"&amp;",
+        "<":"&lt;",
+        ">":"&gt;",
+        '"':"&quot;",
+        "'":"&#39;"
+    })[c]);
+}
+
 function panel(id,title,s) {
     let cls = s.signal==="BUY" ? "buy" :
               s.signal==="SELL" ? "sell" : "wait";
 
     document.getElementById(id).innerHTML = `
     <h2>${title} Signal</h2>
-    <div class="signal ${cls}">${s.signal}</div>
-    <p>Entry Price: ${s.entry}</p>
-<p>Candle Momentum: ${s.momentum}</p>
-    <p>RSI 14: ${s.rsi}</p>
-    <p>EMA 9: ${s.ema9}</p>
-    <p>EMA 21: ${s.ema21}</p>
-    <p>Signal Strength: ${s.strength}</p>
-    <small>${s.note}</small>`;
+    <div class="signal ${cls}">${escapeHTML(s.signal)}</div>
+    <p>Entry Price: ${escapeHTML(s.entry)}</p>
+    <p>Candle Momentum: ${escapeHTML(s.momentum)}</p>
+    <p>RSI 14: ${escapeHTML(s.rsi)}</p>
+    <p>EMA 9: ${escapeHTML(s.ema9)}</p>
+    <p>EMA 21: ${escapeHTML(s.ema21)}</p>
+    <p>Signal Strength: ${escapeHTML(s.strength)}</p>
+    <small>${escapeHTML(s.note)}</small>`;
 }
+
 function finalPanel(s) {
     let cls = s.signal==="BUY" ? "buy" :
               s.signal==="SELL" ? "sell" : "wait";
 
     document.getElementById("final").innerHTML = `
-    <h2>FINAL CONFIRMATION V2.1</h2>
-    <div class="signal ${cls}">${s.signal}</div>
-    <p>Entry Price: ${s.entry}</p>
-   <p>Confirmation Score: ${s.score}/100</p>
-<p>Candle Momentum: ${s.momentum}</p>
-<p>Confirmation: ${s.confirmation}</p>
-    <p>Signal Strength: ${s.strength}</p>
-    <small>${s.note}</small>`;
+    <h2>FINAL CONFIRMATION V2.3</h2>
+    <div class="signal ${cls}">${escapeHTML(s.signal)}</div>
+    <p>Entry Price: ${escapeHTML(s.entry)}</p>
+    <p>Confirmation Score: ${escapeHTML(s.score)}/100</p>
+    <p>Candle Momentum: ${escapeHTML(s.momentum)}</p>
+    <p>Confirmation: ${escapeHTML(s.confirmation)}</p>
+    <p>Signal Strength: ${escapeHTML(s.strength)}</p>
+    <small>${escapeHTML(s.note)}</small>`;
+}
+
+function recordSignal(symbol, s) {
+    let history = getHistory();
+
+    let now = Date.now();
+    let entry = String(s.entry);
+
+    let last = history[0];
+
+    // Avoid repeated identical records within 3 minutes
+    if (last &&
+        last.symbol === symbol &&
+        last.signal === s.signal &&
+        last.entry === entry &&
+        now - last.time < 180000) {
+        return;
+    }
+
+    history.unshift({
+        symbol: symbol,
+        signal: s.signal,
+        entry: entry,
+        score: s.score,
+        strength: s.strength,
+        note: s.note,
+        time: now,
+        outcome: null
+    });
+
+    history = history.slice(0, 10);
+
+    saveHistory(history);
+    renderHistory();
+}
+
+function markOutcome(index, outcome) {
+    let history = getHistory();
+
+    if (!history[index]) return;
+    if (!["WIN", "LOSS"].includes(outcome)) return;
+
+    history[index].outcome = outcome;
+
+    saveHistory(history);
+    renderHistory();
+}
+
+function renderHistory() {
+    let history = getHistory();
+    let wins = history.filter(x => x.outcome === "WIN").length;
+    let losses = history.filter(x => x.outcome === "LOSS").length;
+
+    let resolved = wins + losses;
+
+    let accuracy = resolved > 0
+        ? ((wins / resolved) * 100).toFixed(1)
+        : "0.0";
+
+    document.getElementById("wins").innerText = wins;
+    document.getElementById("losses").innerText = losses;
+    document.getElementById("resolved").innerText = resolved;
+    document.getElementById("accuracy").innerText = accuracy + "%";
+
+    if (history.length === 0) {
+        document.getElementById("history").innerHTML =
+            "No signals recorded yet.";
+        return;
+    }
+
+    document.getElementById("history").innerHTML =
+        history.map((x, i) => {
+
+            let cls = x.signal === "BUY" ? "buy" :
+                      x.signal === "SELL" ? "sell" : "wait";
+
+            let result = x.outcome === "WIN"
+                ? '<span class="win">WIN</span>'
+                : x.outcome === "LOSS"
+                ? '<span class="loss">LOSS</span>'
+                : '<span>Pending verification</span>';
+
+            let buttons = "";
+
+            if (!x.outcome &&
+                (x.signal === "BUY" || x.signal === "SELL")) {
+                buttons = `
+                <button onclick="markOutcome(${i},'WIN')">Mark WIN</button>
+                <button onclick="markOutcome(${i},'LOSS')">Mark LOSS</button>`;
+            }
+
+            return `
+            <div class="history-item">
+                <b>${escapeHTML(x.symbol)}</b>
+                <div class="signal ${cls}">
+                    ${escapeHTML(x.signal)}
+                </div>
+                <p>Entry: ${escapeHTML(x.entry)}</p>
+                <p>Score: ${escapeHTML(x.score)}/100</p>
+                <p>Strength: ${escapeHTML(x.strength)}</p>
+                <p>Time: ${new Date(x.time).toLocaleString()}</p>
+                <p>Result: ${result}</p>
+                ${buttons}
+            </div>`;
+        }).join("");
+}
+
+function clearHistory() {
+    if (!confirm("Delete all signal history?")) return;
+
+    localStorage.removeItem(HISTORY_KEY);
+    renderHistory();
 }
 
 async function loadSignals() {
-    document.getElementById("one").innerText="1M: Loading...";
-    document.getElementById("five").innerText="5M: Loading...";
-    document.getElementById("final").innerText="Smart Engine: Analyzing...";
+
+    document.getElementById("one").innerText = "1M: Loading...";
+    document.getElementById("five").innerText = "5M: Loading...";
+    document.getElementById("final").innerText = "Analyzing...";
 
     try {
         let symbol = document.getElementById("symbol").value;
@@ -125,7 +298,7 @@ async function loadSignals() {
 
         try {
             d = JSON.parse(text);
-        } catch (err) {
+        } catch(e) {
             throw new Error("Backend JSON error");
         }
 
@@ -133,9 +306,11 @@ async function loadSignals() {
             throw new Error(d.error || "API Error");
         }
 
-        panel("one","1M",d.one);
-        panel("five","5M",d.five);
+        panel("one", "1M", d.one);
+        panel("five", "5M", d.five);
         finalPanel(d.final);
+
+        recordSignal(symbol, d.final);
 
         document.getElementById("updated").innerText =
             "Last update: " + new Date().toLocaleTimeString();
@@ -143,15 +318,20 @@ async function loadSignals() {
     } catch(e) {
         document.getElementById("one").innerText =
             "Error: " + e.message;
+
         document.getElementById("five").innerText =
             "Please try again later.";
+
         document.getElementById("final").innerText =
             "Confirmation unavailable.";
     }
 }
 
+renderHistory();
 loadSignals();
-setInterval(loadSignals,180000);
+
+setInterval(loadSignals, 180000);
+
 </script>
 </body>
 </html>
