@@ -558,6 +558,7 @@ def aggregate_five_minutes(candles):
 
     
 
+
 def smart_confirmation(one, five):
     signal1 = one["signal"]
     signal5 = five["signal"]
@@ -568,71 +569,129 @@ def smart_confirmation(one, five):
     score = 0
     signal = "WAIT"
     early_signal = "NONE"
-    confirmation = "Timeframe mismatch"
+    confirmation = "Waiting for confirmation"
     note = "Clear confirmation nahi hai."
 
-    
-    
     # EARLY TREND DETECTION
     if momentum1 == "BULLISH" and momentum5 == "BULLISH":
         early_signal = "EARLY BUY"
+        direction = "BUY"
 
     elif momentum1 == "BEARISH" and momentum5 == "BEARISH":
         early_signal = "EARLY SELL"
+        direction = "SELL"
 
     else:
-        early_signal = "NONE"
+        direction = "NONE"
 
-    # BUY CONFIRMATION
-    if signal1 == "BUY" and signal5 == "BUY":
-        confirmation = "1M + 5M BUY Agreement"
+    # TIMEFRAME AGREEMENT
+    agreement_ok = (
+        direction != "NONE"
+        and signal1 == direction
+        and signal5 == direction
+    )
+
+    if agreement_ok:
+        score += 30
+        confirmation = "1M + 5M Agreement"
+
+    # EMA CONFIRMATION
+    ema_ok = False
+
+    if direction == "BUY":
+        ema_ok = (
+            one["ema9"] > one["ema21"]
+            and five["ema9"] > five["ema21"]
+        )
+
+    elif direction == "SELL":
+        ema_ok = (
+            one["ema9"] < one["ema21"]
+            and five["ema9"] < five["ema21"]
+        )
+
+    if ema_ok:
+        score += 25
+
+    # RSI CONFIRMATION
+    rsi_ok = False
+
+    if direction == "BUY":
+        rsi_ok = (
+            50 < one["rsi"] < 70
+            and 50 < five["rsi"] < 70
+        )
+
+    elif direction == "SELL":
+        rsi_ok = (
+            30 < one["rsi"] < 50
+            and 30 < five["rsi"] < 50
+        )
+
+    if rsi_ok:
+        score += 15
+
+    # MOMENTUM CONFIRMATION
+    momentum_ok = (
+        direction != "NONE"
+        and (
+            (direction == "BUY"
+             and momentum1 == "BULLISH"
+             and momentum5 == "BULLISH")
+            or
+            (direction == "SELL"
+             and momentum1 == "BEARISH"
+             and momentum5 == "BEARISH")
+        )
+    )
+
+    if momentum_ok:
         score += 30
 
-        if one["ema9"] > one["ema21"] and five["ema9"] > five["ema21"]:
-            score += 25
-
-        if 50 < one["rsi"] < 70 and 50 < five["rsi"] < 70:
-            score += 15
-
-        if momentum1 == "BULLISH" and momentum5 == "BULLISH":
-            score += 30
-            signal = "BUY"
-            note = "Bullish trend fully confirmed."
-
-    # SELL CONFIRMATION
-    elif signal1 == "SELL" and signal5 == "SELL":
-        confirmation = "1M + 5M SELL Agreement"
-        score += 30
-
-        if one["ema9"] < one["ema21"] and five["ema9"] < five["ema21"]:
-            score += 25
-
-        if 30 < one["rsi"] < 50 and 30 < five["rsi"] < 50:
-            score += 15
-
-        if momentum1 == "BEARISH" and momentum5 == "BEARISH":
-            score += 30
-            signal = "SELL"
-            note = "Bearish trend fully confirmed."
-
-    else:
-        note = "Timeframe signals match nahi kar rahe."
-
-    score = max(0, min(score, 100))
-
-    if signal == "WAIT":
-        strength = "Weak"
-        if early_signal != "NONE":
-            confirmation = "Early momentum detected"
-            note = early_signal + " detected. Final confirmation ka wait karein."
-    elif score >= 85:
+    # FINAL SIGNAL
+    if (
+        agreement_ok
+        and ema_ok
+        and rsi_ok
+        and momentum_ok
+        and score >= 85
+    ):
+        signal = direction
         strength = "Strong"
-    elif score >= 70:
-        strength = "Medium"
+        confirmation = "Full confirmation: Agreement + EMA + RSI + Momentum"
+        note = direction + " trend fully confirmed."
+
     else:
         signal = "WAIT"
-        strength = "Weak"
-        note = "Confirmation score kam hai."
+
+        if score >= 70:
+            strength = "Medium"
+        elif score >= 40:
+            strength = "Weak"
+        else:
+            strength = "Weak"
+
+        if direction == "NONE":
+            note = "Dono timeframes ka momentum match nahi hai."
+
+        elif not agreement_ok:
+            confirmation = "Timeframe mismatch"
+            note = "Momentum detected, lekin 1M aur 5M signals match nahi kar rahe."
+
+        elif not ema_ok:
+            confirmation = "EMA confirmation pending"
+            note = "EMA confirmation ka wait karein."
+
+        elif not rsi_ok:
+            confirmation = "RSI confirmation pending"
+            note = "RSI supportive zone mein nahi hai."
+
+        else:
+            confirmation = "Final confirmation pending"
+            note = "Final confirmation ka wait karein."
+
+        if early_signal != "NONE":
+            note = early_signal + " detected. Final confirmation ka wait karein."
 
     return {
         "signal": signal,
@@ -644,6 +703,7 @@ def smart_confirmation(one, five):
         "momentum": momentum1 + " / " + momentum5,
         "note": note
     }
+
 
        
         
