@@ -467,13 +467,17 @@ def make_signal(candles):
     price = closes[-1]   
     last_candle = candles[-1]
 
-    if float(last_candle["close"]) > float(last_candle["open"]):
+    
+    # 3-CANDLE MOMENTUM ENGINE
+    recent_change = closes[-1] - closes[-4]
+    momentum_threshold = abs(price) * 0.00002
+
+    if recent_change > momentum_threshold:
         momentum = "BULLISH"
-    elif float(last_candle["close"]) < float(last_candle["open"]):
+    elif recent_change < -momentum_threshold:
         momentum = "BEARISH"
     else:
         momentum = "NEUTRAL"
-
     signal = "WAIT"
     strength = "Low"
     note = "Clear trend nahi hai. Trade ka wait karein."
