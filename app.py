@@ -572,17 +572,15 @@ def smart_confirmation(one, five):
     note = "Clear confirmation nahi hai."
 
     
-# EARLY TREND DETECTION
-if signal1 == "BUY" and signal5 == "BUY" and momentum1 == "BULLISH" and momentum5 == "BULLISH":
-    early_signal = "EARLY BUY"
+    # EARLY TREND DETECTION
+    if signal1 == "BUY" and signal5 == "BUY" and momentum1 == "BULLISH" and momentum5 == "BULLISH":
+        early_signal = "EARLY BUY"
 
-elif signal1 == "SELL" and signal5 == "SELL" and momentum1 == "BEARISH" and momentum5 == "BEARISH":
-    early_signal = "EARLY SELL"
+    elif signal1 == "SELL" and signal5 == "SELL" and momentum1 == "BEARISH" and momentum5 == "BEARISH":
+        early_signal = "EARLY SELL"
 
-else:
-    early_signal = "NONE"
-
-
+    else:
+        early_signal = "NONE"
     # BUY CONFIRMATION
     if signal1 == "BUY" and signal5 == "BUY":
         confirmation = "1M + 5M BUY Agreement"
