@@ -704,13 +704,21 @@ def smart_confirmation(one, five):
 
         if early_signal != "NONE":
             note = early_signal + " detected. Final confirmation ka wait karein."
-
-    return {
+      # V2.4.4 SCORE BREAKDOWN
+    score_breakdown = {
+        "timeframe": 30 if agreement_ok else 0,
+        "ema": 25 if ema_ok else 0,
+        "rsi": 15 if rsi_ok else 0,
+        "momentum": 30 if momentum_ok else 0
+    }
+    
+return {
         "signal": signal,
         "early_signal": early_signal,
         "entry": one["entry"],
         "strength": strength,
         "score": score,
+        "score_breakdown": score_breakdown,
         "confirmation": confirmation,
         "momentum": momentum1 + " / " + momentum5,
         "note": note
