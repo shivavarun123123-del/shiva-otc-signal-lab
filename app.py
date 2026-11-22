@@ -576,13 +576,21 @@ def smart_confirmation(one, five):
     confirmation = "Waiting for confirmation"
     note = "Clear confirmation nahi hai."
 
-    # EARLY TREND DETECTION
-    if momentum1 == "BULLISH" and momentum5 == "BULLISH":
+        # V2.4.3 EARLY BUY/SELL DETECTION
+    if signal1 == "BUY" and signal5 == "BUY":
         early_signal = "EARLY BUY"
+
+    elif signal1 == "SELL" and signal5 == "SELL":
+        early_signal = "EARLY SELL"
+
+    else:
+        early_signal = "NONE"
+
+    # MOMENTUM DIRECTION FOR FINAL CONFIRMATION
+    if momentum1 == "BULLISH" and momentum5 == "BULLISH":
         direction = "BUY"
 
     elif momentum1 == "BEARISH" and momentum5 == "BEARISH":
-        early_signal = "EARLY SELL"
         direction = "SELL"
 
     else:
