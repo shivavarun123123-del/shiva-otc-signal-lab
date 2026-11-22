@@ -563,6 +563,7 @@ def aggregate_five_minutes(candles):
     
 
 
+
 def smart_confirmation(one, five):
     signal1 = one["signal"]
     signal5 = five["signal"]
@@ -576,23 +577,17 @@ def smart_confirmation(one, five):
     confirmation = "Waiting for confirmation"
     note = "Clear confirmation nahi hai."
 
-        # V2.4.3 EARLY BUY/SELL DETECTION
+    # V2.4.3 EARLY BUY/SELL DETECTION
     if signal1 == "BUY" and signal5 == "BUY":
         early_signal = "EARLY BUY"
-
     elif signal1 == "SELL" and signal5 == "SELL":
         early_signal = "EARLY SELL"
 
-    else:
-        early_signal = "NONE"
-
-    # MOMENTUM DIRECTION FOR FINAL CONFIRMATION
+    # MOMENTUM DIRECTION
     if momentum1 == "BULLISH" and momentum5 == "BULLISH":
         direction = "BUY"
-
     elif momentum1 == "BEARISH" and momentum5 == "BEARISH":
         direction = "SELL"
-
     else:
         direction = "NONE"
 
@@ -615,7 +610,6 @@ def smart_confirmation(one, five):
             one["ema9"] > one["ema21"]
             and five["ema9"] > five["ema21"]
         )
-
     elif direction == "SELL":
         ema_ok = (
             one["ema9"] < one["ema21"]
@@ -633,7 +627,6 @@ def smart_confirmation(one, five):
             50 < one["rsi"] < 70
             and 50 < five["rsi"] < 70
         )
-
     elif direction == "SELL":
         rsi_ok = (
             30 < one["rsi"] < 50
@@ -678,51 +671,47 @@ def smart_confirmation(one, five):
 
         if score >= 70:
             strength = "Medium"
-        elif score >= 40:
-            strength = "Weak"
         else:
             strength = "Weak"
 
         if direction == "NONE":
             note = "Dono timeframes ka momentum match nahi hai."
-
         elif not agreement_ok:
             confirmation = "Timeframe mismatch"
             note = "Momentum detected, lekin 1M aur 5M signals match nahi kar rahe."
-
         elif not ema_ok:
             confirmation = "EMA confirmation pending"
             note = "EMA confirmation ka wait karein."
-
         elif not rsi_ok:
             confirmation = "RSI confirmation pending"
             note = "RSI supportive zone mein nahi hai."
-
         else:
             confirmation = "Final confirmation pending"
             note = "Final confirmation ka wait karein."
 
         if early_signal != "NONE":
             note = early_signal + " detected. Final confirmation ka wait karein."
-      # V2.4.4 SCORE BREAKDOWN
-        score_breakdown = {
-            "timeframe": 30 if agreement_ok else 0,
-            "ema": 25 if ema_ok else 0,
-            "rsi": 15 if rsi_ok else 0,
-            "momentum": 30 if momentum_ok else 0
-           }
-    
-         return {
-            "signal": signal,
-            "early_signal": early_signal,
-            "entry": one["entry"],
-            "strength": strength,
-            "score": score,
-            "score_breakdown": score_breakdown,
-            "confirmation": confirmation,
-            "momentum": momentum1 + " / " + momentum5,
-            "note": note
-            }
+
+    # V2.4.4 SCORE BREAKDOWN
+    score_breakdown = {
+        "timeframe": 30 if agreement_ok else 0,
+        "ema": 25 if ema_ok else 0,
+        "rsi": 15 if rsi_ok else 0,
+        "momentum": 30 if momentum_ok else 0
+    }
+
+    return {
+        "signal": signal,
+        "early_signal": early_signal,
+        "entry": one["entry"],
+        "strength": strength,
+        "score": score,
+        "score_breakdown": score_breakdown,
+        "confirmation": confirmation,
+        "momentum": momentum1 + " / " + momentum5,
+        "note": note
+    }
+
 
 
        
