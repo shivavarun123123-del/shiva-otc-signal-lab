@@ -162,21 +162,30 @@ function panel(id, title, s) {
     <small>${escapeHTML(s.note)}</small>`;
 }
 
+
 function finalPanel(s) {
     let cls = s.signal === "BUY" ? "buy" :
               s.signal === "SELL" ? "sell" : "wait";
 
-    document.getElementById("final").innerHTML = `
-    <h2>FINAL CONFIRMATION V2.4</h2>
-    <div class="signal ${cls}">${escapeHTML(s.signal)}</div>
-    <p>Entry Price: ${escapeHTML(s.entry)}</p>
-    <p>Confirmation Score: ${escapeHTML(s.score)}/100</p>
-    <p>Candle Momentum: ${escapeHTML(s.momentum)}</p>
-    <p>Confirmation: ${escapeHTML(s.confirmation)}</p>
-    <p>Signal Strength: ${escapeHTML(s.strength)}</p>
-    <small>${escapeHTML(s.note)}</small>`;
-}
+    const b = s.score_breakdown || {};
 
+    document.getElementById("final").innerHTML = `
+        <h2>FINAL CONFIRMATION V2.4.4</h2>
+        <div class="signal ${cls}">${escapeHTML(s.signal)}</div>
+        <p>Entry Price: ${escapeHTML(s.entry)}</p>
+        <p>Confirmation Score: ${escapeHTML(s.score)}/100</p>
+
+        <h3>SCORE BREAKDOWN</h3>
+        <p>Timeframe: ${Number(b.timeframe || 0)}/30</p>
+        <p>EMA: ${Number(b.ema || 0)}/25</p>
+        <p>RSI: ${Number(b.rsi || 0)}/15</p>
+        <p>Momentum: ${Number(b.momentum || 0)}/30</p>
+
+        <p>Candle Momentum: ${escapeHTML(s.momentum)}</p>
+        <p>Confirmation: ${escapeHTML(s.confirmation)}</p>
+        <p>Signal Strength: ${escapeHTML(s.strength)}</p>
+        <small>${escapeHTML(s.note)}</small>`;
+}
 // SAVE NEW SIGNAL
 function recordSignal(symbol, s) {
     let history = getHistory();
