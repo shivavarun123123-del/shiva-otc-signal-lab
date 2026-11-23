@@ -72,7 +72,7 @@ select {
 
 <h1>SHIVA OTC SIGNAL LAB</h1>
 <p>Bot Status: Connected</p>
-Engine: Smart Confirmation V2.4.2
+Engine: Smart Confirmation V2.4.5
 
 <div class="card">
 <h3>Trading Pair</h3>
@@ -85,13 +85,13 @@ Engine: Smart Confirmation V2.4.2
 </div>
 
 <div id="final" class="card">
-FINAL CONFIRMATION V2.4.2
+FINAL CONFIRMATION V2.4.5
 <div class="signal wait">WAIT</div>
 <p>Waiting for analysis...</p>
 </div>
 
 <div id="early" class="card">
-    EARLY TREND DETECTION V2.4.2
+    EARLY TREND DETECTION V2.4.5
     <div id="earlySignal">NO SETUP</div>
     <p id="earlyNote">Waiting for momentum analysis...</p>
 </div>
