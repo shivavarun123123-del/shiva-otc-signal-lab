@@ -170,7 +170,7 @@ function finalPanel(s) {
     const b = s.score_breakdown || {};
 
     document.getElementById("final").innerHTML = `
-        <h2>FINAL CONFIRMATION V2.4.4</h2>
+        <h2>FINAL CONFIRMATION V2.4.5</h2>
         <div class="signal ${cls}">${escapeHTML(s.signal)}</div>
         <p>Entry Price: ${escapeHTML(s.entry)}</p>
         <p>Confirmation Score: ${escapeHTML(s.score)}/100</p>
