@@ -105,7 +105,7 @@ FINAL CONFIRMATION V2.4.5
 <p>Losses: <span id="losses">0</span></p>
 <p>Resolved Trades: <span id="resolved">0</span></p>
 <div class="stats" id="accuracy">0%</div>
-<small>Accuracy is based only on manually marked outcomes.</small>
+<small>Accuracy uses auto-verified WIN/LOSS from the last 10 saved signals. DRAW is excluded.</small>
 </div>
 
 <div class="card">
