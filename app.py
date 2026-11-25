@@ -105,8 +105,7 @@ FINAL CONFIRMATION V2.4.5
 <p>Losses: <span id="losses">0</span></p>
 <p>Resolved Trades: <span id="resolved">0</span></p>
 <div class="stats" id="accuracy">0%</div>
-<small>Accuracy uses auto-verified WIN/LOSS from the last 10 saved signals. DRAW is excluded.</small>
-</div>
+<small>Accuracy uses all saved auto-verified WIN/LOSS outcomes. DRAW is excluded.</small>
 
 <div class="card">
 <h2>SIGNAL HISTORY</h2>
@@ -217,7 +216,7 @@ function recordSignal(symbol, s) {
         exitPrice: null
     });
 
-    history = history.slice(0, 10);
+    
 
     saveHistory(history);
     renderHistory();
@@ -318,8 +317,8 @@ function renderHistory() {
     }
 
     document.getElementById("history").innerHTML =
-        history.map(x => {
-            let cls = x.signal === "BUY" ? "buy" :
+        
+          history.slice(0, 10).map(x => {  let cls = x.signal === "BUY" ? "buy" :
                       x.signal === "SELL" ? "sell" : "wait";
 
             let result = x.outcome === "WIN"
