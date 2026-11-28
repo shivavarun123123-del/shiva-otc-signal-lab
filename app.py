@@ -833,7 +833,31 @@ def signals():
         app.logger.exception("Signal engine error")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/otc-test")
+def otc_test():
+    if not OTC_API_KEY:
+        return jsonify({"error": "OTCHARTS_API_KEY missing"}), 500
 
+    try:
+        response = requests.get(
+            "https://otcharts.com/v1/candles",
+            params={
+                "venue": "otc",
+                "symbol": "EURUSD_otc",
+                "tf": 60,
+                "limit": 2
+            },
+            headers={
+                "Authorization": f"Bearer {OTC_API_KEY}"
+            },
+            timeout=20
+        )
+
+        response.raise_for_status()
+        return jsonify(response.json())
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)}), 502
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
