@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 API_KEY = os.environ.get("TWELVE_DATA_API_KEY", "").strip()
 API_URL = "https://api.twelvedata.com/time_series"
-
+OTC_API_KEY = os.environ.get("OTCHARTS_API_KEY", "").strip()
 
 
 HTML = """
